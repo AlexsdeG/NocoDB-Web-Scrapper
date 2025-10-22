@@ -44,7 +44,6 @@ def main():
         ("config.py", "Configuration manager"),
         ("scraper.py", "Web scraper module"),
         ("requirements.txt", "Python dependencies"),
-        (".env.example", "Environment variables template"),
     ]
     
     print("Checking required files:")
@@ -76,33 +75,7 @@ def main():
                 all_files_exist = False
     
     print()
-    
-    # Check environment variables template
-    print("Checking .env.example content:")
-    env_example_path = ".env.example"
-    if os.path.exists(env_example_path):
-        with open(env_example_path, 'r') as f:
-            content = f.read()
-            required_vars = [
-                "NOCODB_API_TOKEN",
-                "NOCODB_URL", 
-                "NOCODB_PROJECT_ID",
-                "NOCODB_TABLE_ID",
-                "JWT_SECRET_KEY"
-            ]
-            
-            for var in required_vars:
-                if var in content:
-                    print(f"✓ Environment variable: {var}")
-                else:
-                    print(f"✗ Environment variable: {var} (MISSING)")
-                    all_files_exist = False
-    else:
-        print("✗ .env.example file is missing")
-        all_files_exist = False
-    
-    print()
-    
+        
     # Check Python imports
     print("Checking Python module imports:")
     try:
@@ -136,7 +109,6 @@ def main():
         print("2. Activate it: source venv/bin/activate")
         print("3. Install dependencies: pip install -r requirements.txt")
         print("4. Install Playwright: playwright install")
-        print("5. Copy .env.example to .env and configure it")
         print("6. Run the server: python main.py")
         return 0
     else:
