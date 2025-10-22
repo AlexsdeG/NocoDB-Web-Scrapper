@@ -1,0 +1,38 @@
+{
+  "www.immoscout24.de": {
+    "nocodb_field_map": {
+      "Title": "title",
+      "Warmmiete": "warm_rent",
+      "Kaution": "deposit",
+      "Area_m2": "area",
+      "Rooms": "rooms",
+      "Address": "address"
+    },
+    "selectors": {
+      "title": {"type": "id", "value": "expose-title"},
+      "warm_rent": {"type": "css", "value": ".is24-sc-sub-headline.is24-sc-sub-headline-m.is24-sc-sub-headline-regular.is24-sc-sub-headline-warm"},
+      "deposit": {"type": "css", "value": "div.is24qa-deposit span.is24-value"},
+      "area": {"type": "css", "value": "div.is24qa-flaeche span.is24-value"},
+      "rooms": {"type": "css", "value": "div.is24qa-zimmer span.is24-value"},
+      "address": {"type": "css", "value": ".map-address span"}
+    }
+  },
+  "www.immowelt.de": {
+    "nocodb_field_map": {
+      "Title": "title",
+      "Warmmiete": "warm_rent",
+      "Kaution": "deposit",
+      "Area_m2": "area",
+      "Rooms": "rooms",
+      "Address": "address"
+    },
+    "selectors": {
+      "title": {"type": "css", "value": "h1.expose-title"},
+      "warm_rent": {"type": "css", "value": "div.price-field span.price"},
+      "deposit": {"type": "css", "value": "div.deposit-field span.value"},
+      "area": {"type": "css", "value": "div.area-field span.value"},
+      "rooms": {"type": "css", "value": "div.rooms-field span.value"},
+      "address": {"type": "css", "value": "div.address-field span.address"}
+    }
+  }
+}
