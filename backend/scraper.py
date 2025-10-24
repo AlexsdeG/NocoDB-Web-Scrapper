@@ -2,6 +2,7 @@ import asyncio
 import re
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import logging
 
@@ -9,64 +10,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Try to import playwright, but make it optional
-try:
-    from playwright.async_api import async_playwright
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
-    logger.warning("Playwright not available, will use alternative methods")
-
 class WebScraper:
     """Web scraper for extracting data from websites."""
     
-    def __init__(self, use_playwright=True):
+    def __init__(self):
         self.browser = None
         self.playwright = None
-        self.use_playwright = use_playwright and PLAYWRIGHT_AVAILABLE
     
     async def __aenter__(self):
         """Async context manager entry."""
-        if self.use_playwright:
-            try:
-                self.playwright = await async_playwright().start()
-                # Try to launch browser with error handling and more permissive flags
-                try:
-                    self.browser = await self.playwright.chromium.launch(
-                        headless=True,
-                        args=[
-                            '--no-sandbox',
-                            '--disable-dev-shm-usage',
-                            '--disable-blink-features=AutomationControlled',
-                            '--disable-gpu',
-                            '--disable-software-rasterizer',
-                            '--disable-web-security',
-                            '--disable-features=IsolateOrigins,site-per-process'
-                        ],
-                        chromium_sandbox=False
-                    )
-                    logger.info("Successfully launched Chromium browser")
-                except Exception as e:
-                    logger.error(f"Failed to launch browser: {e}")
-                    logger.info("Trying Firefox as alternative...")
-                    # Try Firefox as alternative
-                    try:
-                        self.browser = await self.playwright.firefox.launch(
-                            headless=True,
-                            args=['--no-sandbox']
-                        )
-                        logger.info("Successfully launched Firefox browser")
-                    except Exception as e2:
-                        logger.error(f"Firefox also failed: {e2}")
-                        logger.info("Falling back to requests-based scraping")
-                        if self.playwright:
-                            await self.playwright.stop()
-                        self.playwright = None
-                        self.browser = None
-                        self.use_playwright = False
-            except Exception as e:
-                logger.error(f"Playwright initialization failed: {e}")
-                self.use_playwright = False
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=True)
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -113,22 +67,46 @@ class WebScraper:
         try:
             if selector_type == "id":
                 element = soup.find(id=selector_value)
-                return element.get_text(strip=True) if element else None
+                if element:
+                    text = element.get_text(strip=True)
+                    logger.debug(f"Found element by ID '{selector_value}': {text[:50]}...")
+                    return text
+                else:
+                    logger.debug(f"No element found with ID '{selector_value}'")
+                    return None
             
             elif selector_type == "class":
                 elements = soup.find_all(class_=selector_value)
-                return elements[0].get_text(strip=True) if elements else None
+                if elements:
+                    text = elements[0].get_text(strip=True)
+                    logger.debug(f"Found element by class '{selector_value}': {text[:50]}...")
+                    return text
+                else:
+                    logger.debug(f"No element found with class '{selector_value}'")
+                    return None
             
             elif selector_type == "css":
                 element = soup.select_one(selector_value)
-                return element.get_text(strip=True) if element else None
+                if element:
+                    text = element.get_text(strip=True)
+                    logger.debug(f"Found element by CSS '{selector_value}': {text[:50]}...")
+                    return text
+                else:
+                    logger.debug(f"No element found with CSS '{selector_value}'")
+                    return None
             
             elif selector_type == "xpath":
                 # For XPath, we'd need a different library like lxml
                 # For now, we'll try to convert simple XPath to CSS
                 css_selector = selector_value.replace('//', '').replace('[', '').replace(']', '')
                 element = soup.select_one(css_selector)
-                return element.get_text(strip=True) if element else None
+                if element:
+                    text = element.get_text(strip=True)
+                    logger.debug(f"Found element by XPath '{selector_value}': {text[:50]}...")
+                    return text
+                else:
+                    logger.debug(f"No element found with XPath '{selector_value}'")
+                    return None
             
             else:
                 logger.warning(f"Unknown selector type: {selector_type}")
@@ -137,29 +115,6 @@ class WebScraper:
         except Exception as e:
             logger.error(f"Error extracting with selector {selector_type}='{selector_value}': {e}")
             return None
-    
-    async def _fetch_with_requests(self, url: str) -> str:
-        """Fallback method using requests library."""
-        import requests
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
-        
-        try:
-            response = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
-            response.raise_for_status()
-            return response.text
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 401:
-                raise Exception("Website requires browser authentication - Playwright/browser is required for this site")
-            raise
     
     async def scrape_apartment_data(self, url: str, scraper_config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -175,28 +130,21 @@ class WebScraper:
         logger.info(f"Scraping URL: {url}")
         
         try:
-            # Get page content
-            if self.use_playwright and self.browser:
-                # Use Playwright
-                page = await self.browser.new_page()
-                
-                # Set extra headers to avoid detection
-                await page.set_extra_http_headers({
-                    'Accept-Language': 'en-US,en;q=0.9,de;q=0.8'
-                })
-                
-                page.set_default_timeout(30000)
-                await page.goto(url, wait_until="networkidle")
-                
-                # Wait a bit for dynamic content
-                await page.wait_for_timeout(2000)
-                
-                content = await page.content()
-                await page.close()
-            else:
-                # Fallback to requests
-                logger.warning("Using requests-based scraping - may not work with all websites")
-                content = await self._fetch_with_requests(url)
+            # Create a new page and navigate to the URL
+            page = await self.browser.new_page()
+            
+            # Set a reasonable timeout
+            page.set_default_timeout(30000)
+            
+            # Navigate to the URL and wait for content to load
+            await page.goto(url, wait_until="networkidle")
+            
+            # Wait a bit more for dynamic content to load
+            await page.wait_for_timeout(2000)
+            
+            # Get the page content
+            content = await page.content()
+            await page.close()
             
             # Parse with BeautifulSoup
             soup = BeautifulSoup(content, 'html.parser')
@@ -222,6 +170,7 @@ class WebScraper:
                     logger.warning(f"Could not extract {field_name}")
             
             logger.info(f"Successfully extracted data: {list(extracted_data.keys())}")
+            logger.debug(f"Extracted data values: {extracted_data}")
             return extracted_data
             
         except Exception as e:

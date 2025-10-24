@@ -90,6 +90,29 @@ def get_nocodb_table_url() -> str:
     
     return f"{base_url}/api/v2/tables/{table_id}/records"
 
+def check_existing_url(url: str, url_field_id: str) -> Optional[Dict[str, Any]]:
+    """Check if a URL already exists in NocoDB."""
+    try:
+        table_url = get_nocodb_table_url()
+        headers = get_nocodb_headers()
+        
+        # Query for existing record with the same URL
+        where_clause = f"where={url_field_id}~{url}"
+        response = requests.get(f"{table_url}?{where_clause}", headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            records = data.get("list", [])
+            if records:
+                return records[0]  # Return the first matching record
+        
+        return None
+        
+    except Exception as e:
+        # Log error but don't fail the scraping process
+        print(f"Error checking existing URL: {e}")
+        return None
+
 # API Routes
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -153,6 +176,17 @@ async def scrape_url(
                 detail=f"No scraper configuration found for domain: {domain}"
             )
         
+        # Check if URL already exists in NocoDB
+        url_field_id = scraper_config.nocodb_field_map.get("url_address")
+        if url_field_id:
+            existing_record = check_existing_url(url, url_field_id)
+            if existing_record:
+                return ScrapeResponse(
+                    success=False,
+                    message=f"Listing already exists in database. Found at ID: {existing_record.get('Id')}",
+                    data={"existing_record": existing_record}
+                )
+        
         # Scrape the data
         scraped_data = await scrape_apartment_data(url, scraper_config.model_dump())
         
@@ -164,13 +198,19 @@ async def scrape_url(
             if internal_name in scraped_data:
                 nocodb_data[nocodb_field] = scraped_data[internal_name]
         
-        # Add URL and CreatedBy fields
-        nocodb_data["URL"] = url
+        # Add URL address field
+        url_field_id = field_map.get("url_address")
+        if url_field_id:
+            nocodb_data[url_field_id] = url
         
-        # Get user's NocoDB email
+        # Add found_by field with user email
+        found_by_field_id = field_map.get("found_by")
         user_map = config_manager.user_map
         user_email = user_map.get(current_user)
-        if user_email:
+        if found_by_field_id and user_email:
+            nocodb_data[found_by_field_id] = user_email
+        elif user_email:
+            # Fallback to CreatedBy field if found_by is not configured
             nocodb_data["CreatedBy"] = [{"email": user_email}]
         
         # Send data to NocoDB

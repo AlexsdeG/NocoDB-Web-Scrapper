@@ -75,7 +75,7 @@ def main():
                 all_files_exist = False
     
     print()
-        
+    
     # Check Python imports
     print("Checking Python module imports:")
     try:
@@ -109,6 +109,7 @@ def main():
         print("2. Activate it: source venv/bin/activate")
         print("3. Install dependencies: pip install -r requirements.txt")
         print("4. Install Playwright: playwright install")
+        print("5. Copy .env.example to .env and configure it")
         print("6. Run the server: python main.py")
         return 0
     else:
