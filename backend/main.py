@@ -154,7 +154,7 @@ async def scrape_url(
             )
         
         # Scrape the data
-        scraped_data = await scrape_apartment_data(url, scraper_config.dict())
+        scraped_data = await scrape_apartment_data(url, scraper_config.model_dump())
         
         # Map field names to NocoDB field names
         nocodb_data = {}

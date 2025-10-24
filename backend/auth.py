@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
