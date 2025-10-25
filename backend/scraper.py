@@ -177,33 +177,19 @@ class WebScraper:
             logger.error(f"Error scraping {url}: {e}")
             raise Exception(f"Scraping failed: {str(e)}")
 
-async def scrape_apartment_data(url: str, scraper_config: Dict[str, Any], scrapers_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def scrape_apartment_data(url: str, scraper_config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convenience function to scrape apartment data with URL cleaning.
+    Convenience function to scrape apartment data.
     
     Args:
         url: The URL to scrape
         scraper_config: Configuration dictionary containing selectors and field mappings
-        scrapers_config: Full scrapers configuration dictionary (optional, for URL cleaning)
         
     Returns:
-        Dictionary containing the scraped data and cleaned URL
+        Dictionary containing the scraped data
     """
-    # Clean the URL if scrapers_config is provided
-    cleaned_url = url
-    if scrapers_config:
-        domain = extract_domain_from_url(url)
-        if domain:
-            domain_config = get_scraper_config_for_domain(domain, scrapers_config)
-            if domain_config:
-                cleaned_url = clean_url_with_scraper_config(url, domain_config)
-    
     async with WebScraper() as scraper:
-        scraped_data = await scraper.scrape_apartment_data(cleaned_url, scraper_config)
-        # Add the cleaned URL to the response
-        scraped_data['cleaned_url'] = cleaned_url
-        scraped_data['original_url'] = url
-        return scraped_data
+        return await scraper.scrape_apartment_data(url, scraper_config)
 
 def extract_domain_from_url(url: str) -> Optional[str]:
     """Extract domain from URL."""
@@ -212,7 +198,7 @@ def extract_domain_from_url(url: str) -> Optional[str]:
         return parsed.netloc.lower()
     except Exception:
         return None
-
+    
 def clean_url_with_scraper_config(url: str, scraper_config: Dict[str, Any]) -> str:
     """Clean and normalize URL using scraper-specific configuration."""
     try:

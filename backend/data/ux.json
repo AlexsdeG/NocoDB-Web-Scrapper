@@ -1,0 +1,99 @@
+{
+  "form_fields": [
+    {
+      "name": "title",
+      "label": "Titel",
+      "type": "text",
+      "required": false,
+      "placeholder": "Titel der Immobilie",
+      "validation": {
+        "min_length": 3,
+        "max_length": 200
+      }
+    },
+    {
+      "name": "warm_rent",
+      "label": "Warmmiete",
+      "type": "currency",
+      "required": false,
+      "placeholder": "z.B. 1.200,00",
+      "validation": {
+        "min": 0,
+        "max": 10000
+      }
+    },
+    {
+      "name": "deposit",
+      "label": "Kaution",
+      "type": "currency",
+      "required": false,
+      "placeholder": "z.B. 3.600,00",
+      "validation": {
+        "min": 0,
+        "max": 50000
+      }
+    },
+    {
+      "name": "area",
+      "label": "Fläche (m²)",
+      "type": "number",
+      "required": false,
+      "placeholder": "z.B. 75",
+      "validation": {
+        "min": 10,
+        "max": 500
+      }
+    },
+    {
+      "name": "rooms",
+      "label": "Zimmer",
+      "type": "number",
+      "required": false,
+      "placeholder": "z.B. 3",
+      "validation": {
+        "min": 1,
+        "max": 20
+      }
+    },
+    {
+      "name": "address",
+      "label": "Adresse",
+      "type": "text",
+      "required": false,
+      "placeholder": "Straße Hausnummer, PLZ Ort",
+      "validation": {
+        "min_length": 5,
+        "max_length": 300
+      }
+    }
+  ],
+  "input_modes": [
+    {
+      "value": "manual",
+      "label": "Manuell eingeben",
+      "description": "Geben Sie alle Daten manuell ein"
+    },
+    {
+      "value": "scraper",
+      "label": "Automatisch scrapen",
+      "description": "Versucht, die Daten automatisch von der Webseite zu extrahieren"
+    }
+  ],
+  "frontend_config": {
+    "app_title": "NocoDB Web Scraper",
+    "app_description": "Daten aus Webseiten extrahieren und in NocoDB speichern",
+    "theme": {
+      "primary_color": "#2563eb",
+      "secondary_color": "#64748b",
+      "success_color": "#16a34a",
+      "warning_color": "#f59e0b",
+      "error_color": "#dc2626"
+    },
+    "ui_settings": {
+      "auto_refresh_token": true,
+      "token_refresh_threshold": 300,
+      "notice_auto_hide": 5000,
+      "max_url_length": 2048
+    }
+  }
+}

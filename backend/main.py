@@ -15,10 +15,7 @@ from auth import (
     get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from config import ConfigManager
-from scraper import (
-    scrape_apartment_data, extract_domain_from_url, 
-    clean_url_with_scraper_config
-)
+from scraper import scrape_apartment_data, extract_domain_from_url, clean_url_with_scraper_config
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -55,6 +52,7 @@ class ScrapeResponse(BaseModel):
 class SignupRequest(BaseModel):
     username: str
     password: str
+    repassword: str
     nocodb_email: EmailStr
     signup_secret: str
 
@@ -66,6 +64,29 @@ class StatusResponse(BaseModel):
     api_status: str
     nocodb_status: str
     message: str
+
+class CheckURLRequest(BaseModel):
+    url: str
+    mode: str = "scraper"  # scraper, manual, api
+
+class CheckURLResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+class SaveDataRequest(BaseModel):
+    url: str
+    mode: str
+    data: Dict[str, Any]
+
+class SaveDataResponse(BaseModel):
+    success: bool
+    message: str
+    record_id: Optional[str] = None
+
+class UXConfigResponse(BaseModel):
+    success: bool
+    config: Dict[str, Any]
 
 # Utility functions
 def get_nocodb_headers() -> Dict[str, str]:
@@ -103,19 +124,14 @@ def check_existing_url(url: str, url_field_id: str) -> Optional[Dict[str, Any]]:
         # Use exact match filter: (fieldId,eq,value)
         # NocoDB filter format: where=(field,operator,value)
         where_clause = f"where=({url_field_id},eq,{quote(url)})"
-        print("DEBUG: Checking existing URL with filter clause:", where_clause)
         
         response = requests.get(f"{table_url}?{where_clause}", headers=headers)
-        print("DEBUG: NocoDB response status:", response.status_code)
         
         if response.status_code == 200:
             data = response.json()
             records = data.get("list", [])
-            print("DEBUG: NocoDB response data:", json.dumps(data, indent=2))
             if records:
                 return records[0]  # Return the first matching record
-        else:
-            print("DEBUG: NocoDB response text:", response.text)
         
         return None
         
@@ -125,6 +141,197 @@ def check_existing_url(url: str, url_field_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 # API Routes
+@app.get("/ux-config", response_model=UXConfigResponse)
+async def get_ux_config():
+    """Get UX configuration for frontend."""
+    try:
+        return UXConfigResponse(
+            success=True,
+            config=config_manager.ux_config
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load UX configuration: {str(e)}"
+        )
+
+@app.post("/check-url", response_model=CheckURLResponse)
+async def check_url(
+    request: CheckURLRequest,
+    current_user: str = Depends(get_current_user)
+):
+    """Check URL validity and domain support."""
+    try:
+        url = request.url
+        mode = request.mode
+        
+        # Validate URL
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            return CheckURLResponse(
+                success=False,
+                message="Invalid URL format"
+            )
+        
+        # Extract domain and get scraper configuration
+        domain = extract_domain_from_url(url)
+        if not domain:
+            return CheckURLResponse(
+                success=False,
+                message="Could not extract domain from URL"
+            )
+        
+        scraper_config = config_manager.get_scraper_config(domain)
+        if not scraper_config:
+            return CheckURLResponse(
+                success=False,
+                message=f"No scraper configuration found for domain: {domain}"
+            )
+        
+        # Clean URL using scraper-specific configuration
+        cleaned_url = clean_url_with_scraper_config(url, scraper_config.model_dump())
+        
+        # Check if URL already exists in NocoDB
+        url_field_id = scraper_config.nocodb_field_map.get("url_address")
+        if url_field_id:
+            existing_record = check_existing_url(cleaned_url, url_field_id)
+            if existing_record:
+                return CheckURLResponse(
+                    success=False,
+                    message=f"Listing already exists in database. Found at ID: {existing_record.get('Id')}",
+                    data={"existing_record": existing_record}
+                )
+        
+        # If mode is scraper, try to scrape data
+        scraped_data = {}
+        if mode == "scraper":
+            try:
+                scraped_data = await scrape_apartment_data(cleaned_url, scraper_config.model_dump())
+            except Exception as e:
+                # If scraping fails, return error but allow manual input
+                return CheckURLResponse(
+                    success=False,
+                    message=f"Scraping failed: {str(e)}. You can switch to manual mode.",
+                    data={"scraping_failed": True, "domain": domain}
+                )
+        
+        return CheckURLResponse(
+            success=True,
+            message="URL is valid and ready for processing",
+            data={
+                "domain": domain,
+                "scraped_data": scraped_data,
+                "mode": mode
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"URL check failed: {str(e)}"
+        )
+
+@app.post("/save-data", response_model=SaveDataResponse)
+async def save_data(
+    request: SaveDataRequest,
+    current_user: str = Depends(get_current_user)
+):
+    """Save processed data to NocoDB."""
+    try:
+        url = request.url
+        data = request.data
+        
+        # Validate URL
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid URL format"
+            )
+        
+        # Extract domain and get scraper configuration
+        domain = extract_domain_from_url(url)
+        if not domain:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not extract domain from URL"
+            )
+        
+        scraper_config = config_manager.get_scraper_config(domain)
+        if not scraper_config:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No scraper configuration found for domain: {domain}"
+            )
+        
+        # Clean URL using scraper-specific configuration
+        cleaned_url = clean_url_with_scraper_config(url, scraper_config.model_dump())
+        
+        # Final check if URL already exists in NocoDB
+        url_field_id = scraper_config.nocodb_field_map.get("url_address")
+        if url_field_id:
+            existing_record = check_existing_url(cleaned_url, url_field_id)
+            print("DEBUG SAVE DATA: Checking existing URL", cleaned_url, url_field_id, existing_record)
+            if existing_record:
+                return SaveDataResponse(
+                    success=False,
+                    message=f"Listing already exists in database. Found at ID: {existing_record.get('Id')}"
+                )
+        
+        # Map field names to NocoDB field names
+        nocodb_data = {}
+        field_map = scraper_config.nocodb_field_map
+        
+        for internal_name, nocodb_field in field_map.items():
+            if internal_name in data and data[internal_name] is not None:
+                nocodb_data[nocodb_field] = data[internal_name]
+        
+        # Add URL address field
+        if url_field_id:
+            nocodb_data[url_field_id] = cleaned_url
+        
+        # Add found_by field with user email
+        found_by_field_id = field_map.get("found_by")
+        user_map = config_manager.user_map
+        user_email = user_map.get(current_user)
+        if found_by_field_id and user_email:
+            nocodb_data[found_by_field_id] = user_email
+        elif user_email:
+            # Fallback to CreatedBy field if found_by is not configured
+            nocodb_data["CreatedBy"] = [{"email": user_email}]
+        
+        # Send data to NocoDB
+        table_url = get_nocodb_table_url()
+        headers = get_nocodb_headers()
+        
+        response = requests.post(table_url, json=nocodb_data, headers=headers)
+        
+        if response.status_code not in [200, 201]:
+            error_detail = f"NocoDB API error: {response.status_code} - {response.text}"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_detail
+            )
+        
+        # Get the record ID from response
+        response_data = response.json()
+        record_id = response_data.get("Id") or response_data.get("id")
+        
+        return SaveDataResponse(
+            success=True,
+            message="Data successfully saved to NocoDB",
+            record_id=str(record_id) if record_id else None
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Save failed: {str(e)}"
+        )
+
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return access token."""
@@ -162,8 +369,18 @@ async def scrape_url(
 ):
     """Scrape data from a URL and add it to NocoDB."""
     try:
-        # Extract domain and get scraper configuration first
-        domain = extract_domain_from_url(request.url)
+        url = request.url
+        
+        # Validate URL
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid URL format"
+            )
+        
+        # Extract domain and get scraper configuration
+        domain = extract_domain_from_url(url)
         if not domain:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,7 +395,7 @@ async def scrape_url(
             )
         
         # Clean URL using scraper-specific configuration
-        cleaned_url = clean_url_with_scraper_config(request.url, scraper_config.model_dump())
+        cleaned_url = clean_url_with_scraper_config(url, scraper_config.model_dump())
         
         # Validate cleaned URL
         parsed_url = urlparse(cleaned_url)
@@ -191,21 +408,16 @@ async def scrape_url(
         # Check if cleaned URL already exists in NocoDB
         url_field_id = scraper_config.nocodb_field_map.get("url_address")
         if url_field_id:
-            print("DEBUG: Checking for existing URL in NocoDB", cleaned_url, url_field_id)
             existing_record = check_existing_url(cleaned_url, url_field_id)
             if existing_record:
                 return ScrapeResponse(
                     success=False,
                     message=f"Listing already exists in database. Found at ID: {existing_record.get('Id')}",
-                    data={"existing_record": existing_record, "cleaned_url": cleaned_url}
+                    data={"existing_record": existing_record}
                 )
         
-        # Scrape the data using cleaned URL and pass full scrapers config
-        scraped_data = await scrape_apartment_data(
-            request.url, 
-            scraper_config.model_dump(),
-            config_manager.scrapers_raw  # Changed from scrapers_data to scrapers_raw
-        )
+        # Scrape the data
+        scraped_data = await scrape_apartment_data(cleaned_url, scraper_config.model_dump())
         
         # Map field names to NocoDB field names
         nocodb_data = {}
@@ -215,7 +427,7 @@ async def scrape_url(
             if internal_name in scraped_data:
                 nocodb_data[nocodb_field] = scraped_data[internal_name]
         
-        # Add URL address field (use cleaned URL)
+        # Add URL address field
         url_field_id = field_map.get("url_address")
         if url_field_id:
             nocodb_data[url_field_id] = cleaned_url
@@ -297,6 +509,7 @@ async def get_status():
 async def signup_user(request: SignupRequest):
     """Register a new user."""
     try:
+        print("DEBUG SIGNUP: Received signup request", config_manager.config.signup_secret)
         # Verify signup secret
         if request.signup_secret != config_manager.config.signup_secret:
             raise HTTPException(
@@ -311,6 +524,15 @@ async def signup_user(request: SignupRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Username already exists"
             )
+        print("DEBUG SIGNUP: Username is available")
+        
+        # Check if passwords match
+        if request.password != request.repassword:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwords do not match"
+            )
+        print("DEBUG SIGNUP: Passwords match")
         
         # Hash password and save user
         hashed_password = get_password_hash(request.password)
@@ -327,8 +549,10 @@ async def signup_user(request: SignupRequest):
         return {"message": "User successfully registered"}
         
     except HTTPException:
+        print("DEBUG SIGNUP: HTTPException occurred")
         raise
     except Exception as e:
+        print("DEBUG SIGNUP: Exception occurred", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Signup failed: {str(e)}"
@@ -361,6 +585,21 @@ async def update_user(
             detail=f"Update failed: {str(e)}"
         )
 
+@app.get("/users/me")
+async def get_current_user_info(current_user: str = Depends(get_current_user)):
+    """Get current user's information."""
+    try:
+        user_info = {
+            "username": current_user,
+            "nocodb_email": config_manager.user_map.get(current_user)
+        }
+        return {"user": user_info}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve user information: {str(e)}"
+        )
+
 @app.post("/validate-email")
 async def validate_nocodb_email(
     email: EmailStr,
@@ -388,7 +627,7 @@ async def root():
     }
 
 # Serve static files (for frontend)
-# app.mount("/static", StaticFiles(directory="frontend"), name="static")
+app.mount("/static", StaticFiles(directory="../frontend", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

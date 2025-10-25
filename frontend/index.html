@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">NocoDB Web Scraper</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-spider"></i>
+                    <span id="app-title">NocoDB Web Scraper</span>
+                </div>
+                <nav class="nav">
+                    <div class="nav-item" id="status-indicators">
+                        <span class="status-indicator" id="api-status">
+                            <i class="fas fa-circle"></i> API
+                        </span>
+                        <span class="status-indicator" id="nocodb-status">
+                            <i class="fas fa-circle"></i> NocoDB
+                        </span>
+                    </div>
+                    <div class="nav-item user-menu" id="user-menu">
+                        <button class="user-menu-btn" id="user-menu-btn">
+                            <i class="fas fa-user-circle"></i>
+                            <span id="username-display">Benutzer</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="user-dropdown" id="user-dropdown">
+                            <a href="#" id="settings-btn">
+                                <i class="fas fa-cog"></i> Einstellungen
+                            </a>
+                            <a href="#" id="logout-btn">
+                                <i class="fas fa-sign-out-alt"></i> Abmelden
+                            </a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Login View -->
+            <div class="view" id="login-view">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>Anmelden</h2>
+                        <p id="login-description">Melden Sie sich an, um auf den Web Scraper zuzugreifen</p>
+                    </div>
+                    <form class="auth-form" id="login-form">
+                        <div class="form-group">
+                            <label for="login-username">Benutzername</label>
+                            <input type="text" id="login-username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Passwort</label>
+                            <input type="password" id="login-password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="login-btn">
+                            <i class="fas fa-sign-in-alt"></i> Anmelden
+                        </button>
+                    </form>
+                    <div class="auth-footer">
+                        <p>Noch kein Konto? <a href="#" id="show-signup-btn">Registrieren</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signup View -->
+            <div class="view hidden" id="signup-view">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>Registrieren</h2>
+                        <p id="signup-description">Neues Konto für den Web Scraper erstellen</p>
+                    </div>
+                    <form class="auth-form" id="signup-form">
+                        <div class="form-group">
+                            <label for="signup-username">Benutzername</label>
+                            <input type="text" id="signup-username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-email">NocoDB E-Mail</label>
+                            <input type="email" id="signup-email" name="nocodb_email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-password">Passwort</label>
+                            <input type="password" id="signup-password" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-repassword">Passwort wiederholen</label>
+                            <input type="password" id="signup-repassword" name="repassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-secret">Registrierungsschlüssel</label>
+                            <input type="password" id="signup-secret" name="signup_secret" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="register-btn">
+                            <i class="fas fa-user-plus"></i> Registrieren
+                        </button>
+                    </form>
+                    <div class="auth-footer">
+                        <p>Bereits ein Konto? <a href="#" id="show-login-btn">Anmelden</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main View -->
+            <div class="view hidden" id="main-view">
+                <div class="main-content">
+                    <div class="welcome-section">
+                        <h1 id="welcome-header">Willkommen beim NocoDB Web Scraper!</h1>
+                        <p id="welcome-description">Geben Sie eine URL ein, um Daten zu extrahieren und in NocoDB zu speichern</p>
+                    </div>
+
+                    <!-- URL Input Section -->
+                    <div class="url-section">
+                        <div class="url-input-card">
+                            <h3>URL prüfen</h3>
+                            <form class="url-form" id="url-form">
+                                <div class="form-row">
+                                    <div class="form-group flex-grow">
+                                        <label for="url-input">URL der Immobilie</label>
+                                        <input type="url" id="url-input" name="url" placeholder="https://www.domain.com/..." required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="input-mode">Modus</label>
+                                        <select id="input-mode" name="mode">
+                                            <option value="manual" selected>Manuell eingeben</option>
+                                            <option value="scraper">Automatisch scrapen</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="check-url-btn">
+                                    <i class="fas fa-search"></i> URL prüfen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Edit Form Section -->
+                    <div class="edit-section hidden" id="edit-section">
+                        <div class="edit-card">
+                            <div class="edit-header">
+                                <h3>Daten bearbeiten</h3>
+                                <div class="edit-actions">
+                                    <button type="button" class="btn btn-secondary" id="back-btn">
+                                        <i class="fas fa-arrow-left"></i> Zurück
+                                    </button>
+                                    <button type="button" class="btn btn-success" id="save-btn">
+                                        <i class="fas fa-save"></i> Speichern
+                                    </button>
+                                </div>
+                            </div>
+                            <form class="edit-form" id="edit-form">
+                                <div class="form-grid" id="form-fields">
+                                    <!-- Dynamic form fields will be inserted here -->
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div class="view hidden" id="settings-view">
+                <div class="settings-content">
+                    <div class="settings-header">
+                        <h2>Einstellungen</h2>
+                        <button type="button" class="btn btn-secondary" id="settings-back-btn">
+                            <i class="fas fa-arrow-left"></i> Zurück
+                        </button>
+                    </div>
+                    
+                    <div class="settings-card">
+                        <h3>Benutzerinformationen</h3>
+                        <form class="settings-form" id="user-settings-form">
+                            <div class="form-group">
+                                <label for="settings-username">Benutzername</label>
+                                <input type="text" id="settings-username" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="settings-email">NocoDB E-Mail</label>
+                                <input type="email" id="settings-email" name="nocodb_email">
+                            </div>
+                            <div class="form-group">
+                                <label for="settings-password">Neues Passwort</label>
+                                <input type="password" id="settings-password" name="new_password" placeholder="Leer lassen um nicht zu ändern">
+                            </div>
+                            <div class="form-group">
+                                <label for="settings-password-confirm">Passwort bestätigen</label>
+                                <input type="password" id="settings-password-confirm" placeholder="Neues Passwort bestätigen">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Änderungen speichern
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notice System -->
+    <div class="notice-container" id="notice-container"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p id="loading-text">Verarbeitung läuft...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/app.js"></script>
+</body>
+</html>

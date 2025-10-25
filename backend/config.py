@@ -38,6 +38,7 @@ class ConfigManager:
         self._scrapers_raw: Optional[Dict[str, Any]] = None
         self._login_data: Optional[Dict[str, str]] = None
         self._user_map: Optional[Dict[str, str]] = None
+        self._ux_config: Optional[Dict[str, Any]] = None
     
     def _load_json(self, filename: str) -> Dict[str, Any]:
         """Load a JSON file."""
@@ -104,6 +105,13 @@ class ConfigManager:
         self._save_json("user_map.json", data)
         self._user_map = data
     
+    @property
+    def ux_config(self) -> Dict[str, Any]:
+        """Get the UX configuration."""
+        if self._ux_config is None:
+            self._ux_config = self._load_json("ux.json")
+        return self._ux_config
+    
     def get_scraper_config(self, domain: str) -> Optional[ScraperConfig]:
         """Get scraper configuration for a specific domain."""
         return self.scrapers.get(domain)
@@ -115,3 +123,4 @@ class ConfigManager:
         self._scrapers_raw = None
         self._login_data = None
         self._user_map = None
+        self._ux_config = None
