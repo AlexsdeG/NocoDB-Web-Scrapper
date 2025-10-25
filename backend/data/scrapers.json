@@ -17,6 +17,11 @@
       "area": {"type": "css", "value": "div.is24qa-flaeche .is24-value"},
       "rooms": {"type": "css", "value": "div.is24qa-zimmer .is24-value"},
       "address": {"type": "css", "value": "div.map-address span"}
+    },
+    "url_cleaning": {
+      "base_pattern": "https://www.immobilienscout24.de/expose/{id}",
+      "extract_pattern": "https://www\\.immobilienscout24\\.de/expose/(\\d+)",
+      "clean_pattern": "https://www.immobilienscout24.de/expose/{id}"
     }
   },
   "www.immowelt.de": {
@@ -37,6 +42,11 @@
       "area": {"type": "css", "value": "div.area-field span.value"},
       "rooms": {"type": "css", "value": "div.rooms-field span.value"},
       "address": {"type": "css", "value": "div.address-field span.address"}
+    },
+    "url_cleaning": {
+      "base_pattern": "https://www.immowelt.de/expose/{id}",
+      "extract_pattern": "https://www\\.immowelt\\.de/expose/([a-f0-9\\-]+)",
+      "clean_pattern": "https://www.immowelt.de/expose/{id}"
     }
   }
 }

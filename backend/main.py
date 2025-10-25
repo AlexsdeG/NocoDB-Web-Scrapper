@@ -15,7 +15,10 @@ from auth import (
     get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from config import ConfigManager
-from scraper import scrape_apartment_data, extract_domain_from_url
+from scraper import (
+    scrape_apartment_data, extract_domain_from_url, 
+    clean_url_with_scraper_config
+)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -93,18 +96,26 @@ def get_nocodb_table_url() -> str:
 def check_existing_url(url: str, url_field_id: str) -> Optional[Dict[str, Any]]:
     """Check if a URL already exists in NocoDB."""
     try:
+        from urllib.parse import quote
         table_url = get_nocodb_table_url()
         headers = get_nocodb_headers()
         
-        # Query for existing record with the same URL
-        where_clause = f"where={url_field_id}~{url}"
+        # Use exact match filter: (fieldId,eq,value)
+        # NocoDB filter format: where=(field,operator,value)
+        where_clause = f"where=({url_field_id},eq,{quote(url)})"
+        print("DEBUG: Checking existing URL with filter clause:", where_clause)
+        
         response = requests.get(f"{table_url}?{where_clause}", headers=headers)
+        print("DEBUG: NocoDB response status:", response.status_code)
         
         if response.status_code == 200:
             data = response.json()
             records = data.get("list", [])
+            print("DEBUG: NocoDB response data:", json.dumps(data, indent=2))
             if records:
                 return records[0]  # Return the first matching record
+        else:
+            print("DEBUG: NocoDB response text:", response.text)
         
         return None
         
@@ -151,18 +162,8 @@ async def scrape_url(
 ):
     """Scrape data from a URL and add it to NocoDB."""
     try:
-        url = request.url
-        
-        # Validate URL
-        parsed_url = urlparse(url)
-        if not parsed_url.scheme or not parsed_url.netloc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid URL format"
-            )
-        
-        # Extract domain and get scraper configuration
-        domain = extract_domain_from_url(url)
+        # Extract domain and get scraper configuration first
+        domain = extract_domain_from_url(request.url)
         if not domain:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -176,19 +177,35 @@ async def scrape_url(
                 detail=f"No scraper configuration found for domain: {domain}"
             )
         
-        # Check if URL already exists in NocoDB
+        # Clean URL using scraper-specific configuration
+        cleaned_url = clean_url_with_scraper_config(request.url, scraper_config.model_dump())
+        
+        # Validate cleaned URL
+        parsed_url = urlparse(cleaned_url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid URL format"
+            )
+        
+        # Check if cleaned URL already exists in NocoDB
         url_field_id = scraper_config.nocodb_field_map.get("url_address")
         if url_field_id:
-            existing_record = check_existing_url(url, url_field_id)
+            print("DEBUG: Checking for existing URL in NocoDB", cleaned_url, url_field_id)
+            existing_record = check_existing_url(cleaned_url, url_field_id)
             if existing_record:
                 return ScrapeResponse(
                     success=False,
                     message=f"Listing already exists in database. Found at ID: {existing_record.get('Id')}",
-                    data={"existing_record": existing_record}
+                    data={"existing_record": existing_record, "cleaned_url": cleaned_url}
                 )
         
-        # Scrape the data
-        scraped_data = await scrape_apartment_data(url, scraper_config.model_dump())
+        # Scrape the data using cleaned URL and pass full scrapers config
+        scraped_data = await scrape_apartment_data(
+            request.url, 
+            scraper_config.model_dump(),
+            config_manager.scrapers_raw  # Changed from scrapers_data to scrapers_raw
+        )
         
         # Map field names to NocoDB field names
         nocodb_data = {}
@@ -198,10 +215,10 @@ async def scrape_url(
             if internal_name in scraped_data:
                 nocodb_data[nocodb_field] = scraped_data[internal_name]
         
-        # Add URL address field
+        # Add URL address field (use cleaned URL)
         url_field_id = field_map.get("url_address")
         if url_field_id:
-            nocodb_data[url_field_id] = url
+            nocodb_data[url_field_id] = cleaned_url
         
         # Add found_by field with user email
         found_by_field_id = field_map.get("found_by")

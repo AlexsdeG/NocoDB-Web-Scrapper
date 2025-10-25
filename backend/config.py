@@ -4,6 +4,12 @@ import json
 import os
 from pathlib import Path
 
+class UrlCleaningConfig(BaseModel):
+    """Configuration for URL cleaning."""
+    base_pattern: str = Field(..., description="Base URL pattern")
+    extract_pattern: str = Field(..., description="Regex pattern to extract ID")
+    clean_pattern: str = Field(..., description="Clean URL pattern")
+
 class SelectorConfig(BaseModel):
     """Configuration for a CSS selector."""
     type: str = Field(..., description="Type of selector: id, class, css, xpath")
@@ -13,6 +19,7 @@ class ScraperConfig(BaseModel):
     """Configuration for a website scraper."""
     nocodb_field_map: Dict[str, str] = Field(..., description="Map NocoDB field names to internal names")
     selectors: Dict[str, SelectorConfig] = Field(..., description="Selectors for data extraction")
+    url_cleaning: Optional[UrlCleaningConfig] = Field(None, description="URL cleaning configuration")
 
 class AppConfig(BaseModel):
     """Main application configuration."""
@@ -28,6 +35,7 @@ class ConfigManager:
         self.data_dir = Path(data_dir)
         self._config: Optional[AppConfig] = None
         self._scrapers: Optional[Dict[str, ScraperConfig]] = None
+        self._scrapers_raw: Optional[Dict[str, Any]] = None
         self._login_data: Optional[Dict[str, str]] = None
         self._user_map: Optional[Dict[str, str]] = None
     
@@ -66,6 +74,13 @@ class ConfigManager:
         return self._scrapers
     
     @property
+    def scrapers_raw(self) -> Dict[str, Any]:
+        """Get the raw scraper configurations."""
+        if self._scrapers_raw is None:
+            self._scrapers_raw = self._load_json("scrapers.json")
+        return self._scrapers_raw
+    
+    @property
     def login_data(self) -> Dict[str, str]:
         """Get the login credentials."""
         if self._login_data is None:
@@ -97,5 +112,6 @@ class ConfigManager:
         """Reload all configuration files."""
         self._config = None
         self._scrapers = None
+        self._scrapers_raw = None
         self._login_data = None
         self._user_map = None

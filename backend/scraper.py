@@ -177,19 +177,33 @@ class WebScraper:
             logger.error(f"Error scraping {url}: {e}")
             raise Exception(f"Scraping failed: {str(e)}")
 
-async def scrape_apartment_data(url: str, scraper_config: Dict[str, Any]) -> Dict[str, Any]:
+async def scrape_apartment_data(url: str, scraper_config: Dict[str, Any], scrapers_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Convenience function to scrape apartment data.
+    Convenience function to scrape apartment data with URL cleaning.
     
     Args:
         url: The URL to scrape
         scraper_config: Configuration dictionary containing selectors and field mappings
+        scrapers_config: Full scrapers configuration dictionary (optional, for URL cleaning)
         
     Returns:
-        Dictionary containing the scraped data
+        Dictionary containing the scraped data and cleaned URL
     """
+    # Clean the URL if scrapers_config is provided
+    cleaned_url = url
+    if scrapers_config:
+        domain = extract_domain_from_url(url)
+        if domain:
+            domain_config = get_scraper_config_for_domain(domain, scrapers_config)
+            if domain_config:
+                cleaned_url = clean_url_with_scraper_config(url, domain_config)
+    
     async with WebScraper() as scraper:
-        return await scraper.scrape_apartment_data(url, scraper_config)
+        scraped_data = await scraper.scrape_apartment_data(cleaned_url, scraper_config)
+        # Add the cleaned URL to the response
+        scraped_data['cleaned_url'] = cleaned_url
+        scraped_data['original_url'] = url
+        return scraped_data
 
 def extract_domain_from_url(url: str) -> Optional[str]:
     """Extract domain from URL."""
@@ -198,3 +212,44 @@ def extract_domain_from_url(url: str) -> Optional[str]:
         return parsed.netloc.lower()
     except Exception:
         return None
+
+def clean_url_with_scraper_config(url: str, scraper_config: Dict[str, Any]) -> str:
+    """Clean and normalize URL using scraper-specific configuration."""
+    try:
+        url_cleaning = scraper_config.get("url_cleaning")
+        if not url_cleaning:
+            return clean_url_basic(url)
+        
+        extract_pattern = url_cleaning.get("extract_pattern")
+        clean_pattern = url_cleaning.get("clean_pattern")
+        
+        if not extract_pattern or not clean_pattern:
+            return clean_url_basic(url)
+        
+        # Extract the ID from the URL using the pattern
+        match = re.search(extract_pattern, url)
+        if match:
+            extracted_id = match.group(1)
+            # Create clean URL using the clean pattern
+            clean_url = clean_pattern.format(id=extracted_id)
+            logger.info(f"Cleaned URL from '{url}' to '{clean_url}'")
+            return clean_url
+        else:
+            logger.warning(f"Could not extract ID from URL '{url}' using pattern '{extract_pattern}'")
+            return clean_url_basic(url)
+            
+    except Exception as e:
+        logger.error(f"Error cleaning URL with scraper config: {e}")
+        return clean_url_basic(url)
+
+def clean_url_basic(url: str) -> str:
+    """Basic URL cleaning (fallback method)."""
+    try:
+        parsed = urlparse(url)
+        return parsed._replace(query="", fragment="").geturl()
+    except Exception:
+        return url
+
+def get_scraper_config_for_domain(domain: str, scrapers_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Get scraper configuration for a domain from scrapers config dict."""
+    return scrapers_config.get(domain)
