@@ -8,7 +8,8 @@
       "rooms": "chsrfa954h6357h",
       "address": "chsrfa954h6358h",
       "url_address": "c6rkk0pbxosubfn",
-      "found_by": "c15zggv7eeakkpa"
+      "found_by": "c15zggv7eeakkpa",
+      "in_charge": "caygzvw6wc70nj4"
     },
     "selectors": {
       "title": {"type": "id", "value": "expose-title"},
@@ -33,7 +34,8 @@
       "rooms": "chsrfa954h6357h",
       "address": "chsrfa954h6358h",
       "url_address": "c6rkk0pbxosubfn",
-      "found_by": "c15zggv7eeakkpa"
+      "found_by": "c15zggv7eeakkpa",
+      "in_charge": "caygzvw6wc70nj4"
     },
     "selectors": {
       "title": {"type": "css", "value": "h1.expose-title"},

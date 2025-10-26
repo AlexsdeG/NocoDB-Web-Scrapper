@@ -302,6 +302,11 @@ async def save_data(
             # Fallback to CreatedBy field if found_by is not configured
             nocodb_data["CreatedBy"] = [{"email": user_email}]
         
+        # Add in_charge field with user email if configured
+        in_charge_field_id = field_map.get("in_charge")
+        if in_charge_field_id and user_email:
+            nocodb_data[in_charge_field_id] = user_email
+            
         # Send data to NocoDB
         table_url = get_nocodb_table_url()
         headers = get_nocodb_headers()
@@ -441,6 +446,11 @@ async def scrape_url(
         elif user_email:
             # Fallback to CreatedBy field if found_by is not configured
             nocodb_data["CreatedBy"] = [{"email": user_email}]
+            
+        # Add in_charge field with user email if configured
+        in_charge_field_id = field_map.get("in_charge")
+        if in_charge_field_id and user_email:
+            nocodb_data[in_charge_field_id] = user_email
         
         # Send data to NocoDB
         table_url = get_nocodb_table_url()
