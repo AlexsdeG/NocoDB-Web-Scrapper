@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI service
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: nocodb-scraper-backend
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount data directory for persistence
+      - backend/data:/app/data:rw
+      # Optional: Mount logs directory
+      - backend-logs:/app/logs
+    networks:
+      - scraper-network
+    ports:
+      - "127.0.0.1:8091:8091"  # Bind to localhost only (nginx will proxy)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Nginx service
+  frontend:
+    build:
+      context: frontend
+      dockerfile: docker/Dockerfile.frontend
+    container_name: nocodb-scraper-frontend
+    restart: unless-stopped
+    networks:
+      - scraper-network
+    ports:
+      - "127.0.0.1:8090:80"  # Bind to localhost only (system nginx will proxy)
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+# Named volumes for data persistence
+volumes:
+  backend-logs:
+    driver: local
+
+# Network for container communication
+networks:
+  scraper-network:
+    driver: bridge

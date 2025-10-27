@@ -1,0 +1,48 @@
+# Multi-stage build for optimized production image
+FROM python:3.11-slim as base
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Production stage
+FROM base as production
+
+# Install Python dependencies first (for better caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright and Chromium browser
+RUN playwright install chromium && \
+    playwright install-deps chromium
+
+# Copy application code
+COPY main.py scraper.py auth.py config.py ./
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose the FastAPI port
+EXPOSE 8091
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8091/status || exit 1
+
+# Run the application with production settings
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8091", "--workers", "2"]
