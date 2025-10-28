@@ -637,7 +637,7 @@ async def root():
     }
 
 # Serve static files (for frontend)
-app.mount("/static", StaticFiles(directory="../frontend", html=True), name="static")
+# app.mount("/static", StaticFiles(directory="../frontend", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

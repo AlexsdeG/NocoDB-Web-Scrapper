@@ -10,19 +10,32 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}NocoDB Web Scraper - Docker Deployment${NC}"
 echo -e "${GREEN}========================================${NC}"
 
-# Check if .env file exists
-if [ ! -f "../.env" ]; then
-    echo -e "${RED}Error: .env file not found!${NC}"
-    echo -e "${YELLOW}Please copy .env.example to .env and configure it.${NC}"
+# Navigate to script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
+# Check if .env file exists in backend directory
+if [ ! -f "../backend/.env" ]; then
+    echo -e "${RED}Error: backend/.env file not found!${NC}"
+    echo -e "${YELLOW}Please copy backend/.env.example to backend/.env and configure it.${NC}"
     exit 1
 fi
 
 # Check if data directory exists
-if [ ! -d "../data" ]; then
-    echo -e "${RED}Error: data/ directory not found!${NC}"
-    echo -e "${YELLOW}Please ensure the data directory with config files exists.${NC}"
+if [ ! -d "../backend/data" ]; then
+    echo -e "${RED}Error: backend/data/ directory not found!${NC}"
+    echo -e "${YELLOW}Please ensure the backend/data directory with config files exists.${NC}"
     exit 1
 fi
+
+# Check required data files
+REQUIRED_FILES=("config.json" "login.json" "user_map.json" "scrapers.json")
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "../backend/data/$file" ]; then
+        echo -e "${RED}Error: backend/data/$file not found!${NC}"
+        exit 1
+    fi
+done
 
 # Stop existing containers
 echo -e "${YELLOW}Stopping existing containers...${NC}"
