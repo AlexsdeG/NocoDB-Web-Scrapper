@@ -121,15 +121,15 @@
                     </div>
 
                     <!-- URL Input Section -->
-                    <div class="url-section">
+                    <div class="url-section" id="url-section">
                         <div class="url-input-card">
                             <h3>URL prüfen</h3>
                             <form class="url-form" id="url-form">
+                                <div class="form-group">
+                                    <label for="url-input">URL der Immobilie</label>
+                                    <input type="url" id="url-input" name="url" placeholder="https://www.domain.com/..." required class="full-width-input">
+                                </div>
                                 <div class="form-row">
-                                    <div class="form-group flex-grow">
-                                        <label for="url-input">URL der Immobilie</label>
-                                        <input type="url" id="url-input" name="url" placeholder="https://www.domain.com/..." required>
-                                    </div>
                                     <div class="form-group">
                                         <label for="input-mode">Modus</label>
                                         <select id="input-mode" name="mode">
@@ -137,10 +137,10 @@
                                             <option value="scraper">Automatisch scrapen</option>
                                         </select>
                                     </div>
+                                    <button type="submit" class="btn btn-primary" id="check-url-btn">
+                                        <i class="fas fa-search"></i> URL prüfen
+                                    </button>
                                 </div>
-                                <button type="submit" class="btn btn-primary" id="check-url-btn">
-                                    <i class="fas fa-search"></i> URL prüfen
-                                </button>
                             </form>
                         </div>
                     </div>

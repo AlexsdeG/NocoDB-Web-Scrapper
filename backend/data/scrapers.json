@@ -1,15 +1,15 @@
 {
   "www.immobilienscout24.de": {
     "nocodb_field_map": {
-      "title": "chsrfa954h6353h",
-      "warm_rent": "chsrfa954h6354h", 
-      "deposit": "chsrfa954h6355h",
-      "area": "chsrfa954h6356h",
-      "rooms": "chsrfa954h6357h",
-      "address": "chsrfa954h6358h",
-      "url_address": "c6rkk0pbxosubfn",
-      "found_by": "c15zggv7eeakkpa",
-      "in_charge": "caygzvw6wc70nj4"
+      "title": {"id": "chsrfa954h6353h", "type": "map"},
+      "warm_rent": {"id": "cgh7kqjcclm7uys", "type": "map"},
+      "deposit": {"id": "cbmpu7ip6o2zegx", "type": "map"},
+      "area": {"id": "c7zpeqkbbjk24fr", "type": "map"},
+      "rooms": {"id": "cl3ic39j3ffu7af", "type": "map"},
+      "address": {"id": "cc5zu56seb6p4yd", "type": "map"},
+      "url_address": {"id": "c6rkk0pbxosubfn", "type": "input_url", "duplicate_check": true},
+      "found_by": {"id": "c15zggv7eeakkpa", "type": "nocodb_email"},
+      "in_charge": {"id": "caygzvw6wc70nj4", "type": "nocodb_email"}
     },
     "selectors": {
       "title": {"type": "id", "value": "expose-title"},
@@ -27,15 +27,15 @@
   },
   "www.immowelt.de": {
     "nocodb_field_map": {
-      "title": "chsrfa954h6353h",
-      "warm_rent": "chsrfa954h6354h", 
-      "deposit": "chsrfa954h6355h",
-      "area": "chsrfa954h6356h",
-      "rooms": "chsrfa954h6357h",
-      "address": "chsrfa954h6358h",
-      "url_address": "c6rkk0pbxosubfn",
-      "found_by": "c15zggv7eeakkpa",
-      "in_charge": "caygzvw6wc70nj4"
+      "title": {"id": "chsrfa954h6353h", "type": "map"},
+      "warm_rent": {"id": "cgh7kqjcclm7uys", "type": "map"},
+      "deposit": {"id": "cbmpu7ip6o2zegx", "type": "map"},
+      "area": {"id": "c7zpeqkbbjk24fr", "type": "map"},
+      "rooms": {"id": "cl3ic39j3ffu7af", "type": "map"},
+      "address": {"id": "cc5zu56seb6p4yd", "type": "map"},
+      "url_address": {"id": "c6rkk0pbxosubfn", "type": "input_url", "duplicate_check": true},
+      "found_by": {"id": "c15zggv7eeakkpa", "type": "nocodb_email"},
+      "in_charge": {"id": "caygzvw6wc70nj4", "type": "nocodb_email"}
     },
     "selectors": {
       "title": {"type": "css", "value": "h1.expose-title"},

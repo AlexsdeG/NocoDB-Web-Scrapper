@@ -224,6 +224,12 @@ input, select, textarea {
     transition: var(--transition);
 }
 
+.full-width-input {
+    width: 100%;
+    font-size: 1.1rem;
+    padding: 1rem;
+}
+
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--primary-color);
@@ -327,13 +333,11 @@ input:invalid {
 @media (min-width: 768px) {
     .url-form {
         flex-direction: row;
-        align-items: center;
-
+        align-items: end;
     }
     
     .url-form button {
         white-space: nowrap;
-        margin-top: 10px;
     }
 }
 

@@ -36,7 +36,7 @@
    Edit `.env` with your actual values:
    - Get NocoDB API token from your NocoDB instance
    - Get Project ID and Table ID from your NocoDB URL
-   - Generate a strong JWT secret key: `openssl rand -base64 32`
+   - Generate a strong JWT secret key
 
 6. **Test the setup:**
    ```bash
@@ -48,7 +48,7 @@
    python main.py
    ```
 
-The API will be available at `http://localhost:8091` with documentation at `http://localhost:8091/docs`.
+The API will be available at `http://localhost:8000` with documentation at `http://localhost:8000/docs`.
 
 ## Default Credentials
 
@@ -59,19 +59,19 @@ The API will be available at `http://localhost:8091` with documentation at `http
 
 1. **Get access token:**
    ```bash
-   curl -X POST "http://localhost:8091/token" \
+   curl -X POST "http://localhost:8000/token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      -d "username=admin&password=admin123"
    ```
 
 2. **Check status:**
    ```bash
-   curl "http://localhost:8091/status"
+   curl "http://localhost:8000/status"
    ```
 
 3. **Test scraping (replace TOKEN and URL):**
    ```bash
-   curl -X POST "http://localhost:8091/scrape" \
+   curl -X POST "http://localhost:8000/scrape" \
      -H "Authorization: Bearer YOUR_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"url": "https://example.com/listing"}'

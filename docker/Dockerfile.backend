@@ -20,19 +20,46 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code from backend directory
 COPY backend/main.py backend/scraper.py backend/auth.py backend/config.py ./
 
-# Create non-root user for security
-RUN useradd -m -u 1010 appuser && \
-    chown -R appuser:appuser /app
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && chmod 775 /app/data
 
-# Switch to non-root user
-USER appuser
+# Modify the existing pwuser to have UID/GID 1001 to match mounted volume
+# This ensures compatibility with the host file permissions
+RUN usermod -u 1001 pwuser && \
+    groupmod -g 1001 pwuser && \
+    chown -R pwuser:pwuser /app
 
 # Expose the FastAPI port
-EXPOSE 8091
+EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8091/status || exit 1
+    CMD curl -f http://localhost:8000/status || exit 1
 
-# Run the application with production settings
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8091", "--workers", "2"]
+# Create entrypoint script to handle permissions
+RUN echo '#!/bin/bash\n\
+# Ensure data directory has correct permissions\n\
+if [ -d /app/data ]; then\n\
+    echo "Checking /app/data permissions..."\n\
+    echo "Current user: $(id)"\n\
+    echo "Directory ownership: $(ls -ld /app/data)"\n\
+    # Try to create a test file\n\
+    if ! touch /app/data/.test 2>/dev/null; then\n\
+        echo "WARNING: /app/data is not writable by current user"\n\
+        echo "Files in directory:"\n\
+        ls -la /app/data/ 2>/dev/null || echo "Cannot list directory"\n\
+    else\n\
+        rm -f /app/data/.test\n\
+        echo "SUCCESS: /app/data is writable"\n\
+    fi\n\
+fi\n\
+\n\
+# Start the application\n\
+exec uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2\n\
+' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Switch to the Playwright user (now with UID 1001)
+USER pwuser
+
+# Use entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

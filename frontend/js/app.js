@@ -16,7 +16,22 @@ class WebScraperApp {
         this.bindEvents();
         await this.loadUXConfig();
         this.checkAuthStatus();
+        
+        // Start status polling status
         this.startStatusPolling();
+    }
+    
+    isAuthenticated() {
+        return this.currentUser && localStorage.getItem('access_token');
+    }
+    
+    requireAuth() {
+        if (!this.isAuthenticated()) {
+            this.showNotice('Bitte melden Sie sich an, um fortzufahren', 'error');
+            this.showView('login-view');
+            return false;
+        }
+        return true;
     }
 
     // Event Binding
@@ -174,10 +189,74 @@ class WebScraperApp {
     }
 
     handleLogout() {
+        // Clear authentication data
         localStorage.removeItem('access_token');
         this.currentUser = null;
+        
+        // Clear all application data
+        this.currentUrl = null;
+        this.currentMode = null;
+        this.scrapedData = null;
+        this.uxConfig = null;
+        
+        // Clear all form inputs
+        this.clearAllFormInputs();
+        
+        // Stop any ongoing processes
+        if (this.tokenRefreshTimer) {
+            clearInterval(this.tokenRefreshTimer);
+            this.tokenRefreshTimer = null;
+        }
+        
+        // Hide loading states
+        this.hideLoading();
+        
+        // Show login view
         this.showView('login-view');
         this.showNotice('Erfolgreich abgemeldet!', 'info');
+    }
+    
+    clearAllFormInputs() {
+        // Clear URL input
+        const urlInput = document.getElementById('url-input');
+        if (urlInput) urlInput.value = '';
+        
+        // Clear login form
+        const loginUsername = document.getElementById('login-username');
+        const loginPassword = document.getElementById('login-password');
+        if (loginUsername) loginUsername.value = '';
+        if (loginPassword) loginPassword.value = '';
+        
+        // Clear signup form
+        const signupUsername = document.getElementById('signup-username');
+        const signupPassword = document.getElementById('signup-password');
+        const signupEmail = document.getElementById('signup-email');
+        const signupSecret = document.getElementById('signup-secret');
+        if (signupUsername) signupUsername.value = '';
+        if (signupPassword) signupPassword.value = '';
+        if (signupEmail) signupEmail.value = '';
+        if (signupSecret) signupSecret.value = '';
+        
+        // Clear settings form
+        const settingsEmail = document.getElementById('settings-email');
+        const settingsPassword = document.getElementById('settings-password');
+        const settingsNewPassword = document.getElementById('settings-new-password');
+        if (settingsEmail) settingsEmail.value = '';
+        if (settingsPassword) settingsPassword.value = '';
+        if (settingsNewPassword) settingsNewPassword.value = '';
+        
+        // Clear edit form if it exists
+        const editForm = document.getElementById('edit-form');
+        if (editForm) {
+            const inputs = editForm.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                if (input.type === 'checkbox' || input.type === 'radio') {
+                    input.checked = false;
+                } else {
+                    input.value = '';
+                }
+            });
+        }
     }
 
     showMainInterface() {
@@ -224,11 +303,21 @@ class WebScraperApp {
 
     // User Menu
     toggleUserDropdown() {
-        document.getElementById('user-dropdown').classList.toggle('show');
+        if (!this.requireAuth()) return;
+        
+        const dropdown = document.getElementById('user-dropdown');
+        if (dropdown) {
+            dropdown.classList.toggle('show');
+        }
     }
 
     showSettings() {
-        document.getElementById('user-dropdown').classList.remove('show');
+        if (!this.requireAuth()) return;
+        
+        const dropdown = document.getElementById('user-dropdown');
+        if (dropdown) {
+            dropdown.classList.remove('show');
+        }
         this.loadUserSettings();
         this.showView('settings-view');
     }
@@ -291,6 +380,9 @@ class WebScraperApp {
     // Main Interface - URL Handling
     async handleURLCheck(e) {
         e.preventDefault();
+        
+        if (!this.requireAuth()) return;
+        
         const formData = new FormData(e.target);
         const url = formData.get('url');
         const mode = formData.get('mode');
@@ -339,9 +431,10 @@ class WebScraperApp {
     showEditForm() {
         const formFields = document.getElementById('form-fields');
         if (!formFields) {
-            this.showNotice('Formular-Element nicht gefunden', 'error');
+            this.showNotice('Formularfelder-Container nicht gefunden', 'error');
             return;
         }
+        
         formFields.innerHTML = '';
 
         if (!this.uxConfig || !this.uxConfig.form_fields) {
@@ -360,10 +453,21 @@ class WebScraperApp {
         }
 
         this.showView('main-view');
+        
         const editSection = document.getElementById('edit-section');
         const urlSection = document.getElementById('url-section');
-        if (editSection) editSection.classList.remove('hidden');
-        if (urlSection) urlSection.classList.add('hidden');
+        
+        if (editSection) {
+            editSection.classList.remove('hidden');
+        } else {
+            console.error('Edit section not found');
+        }
+        
+        if (urlSection) {
+            urlSection.classList.add('hidden');
+        } else {
+            console.error('URL section not found');
+        }
     }
 
     createFormField(fieldConfig) {
@@ -431,8 +535,21 @@ class WebScraperApp {
     }
 
     backToURLInput() {
-        document.getElementById('edit-section').classList.add('hidden');
-        document.getElementById('url-section').classList.remove('hidden');
+        const editSection = document.getElementById('edit-section');
+        const urlSection = document.getElementById('url-section');
+        
+        if (editSection) {
+            editSection.classList.add('hidden');
+        } else {
+            console.error('Edit section not found');
+        }
+        
+        if (urlSection) {
+            urlSection.classList.remove('hidden');
+        } else {
+            console.error('URL section not found');
+        }
+        
         this.currentUrl = null;
         this.currentMode = null;
         this.scrapedData = null;
@@ -446,32 +563,64 @@ class WebScraperApp {
         }
 
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
+        const data = {};
+        
+        // Process form data and convert types appropriately
+        for (let [key, value] of formData.entries()) {
+            // Skip empty values
+            if (value === null || value === undefined || value.trim() === '') {
+                continue;
+            }
+            data[key] = value;
+        }
 
         // Validate required fields
         const missingFields = [];
-        this.uxConfig.form_fields.forEach(field => {
-            if (field.required && !data[field.name]) {
-                missingFields.push(field.label);
-            }
-        });
+        if (this.uxConfig && this.uxConfig.form_fields) {
+            this.uxConfig.form_fields.forEach(field => {
+                if (field.required && !data[field.name]) {
+                    missingFields.push(field.label);
+                }
+            });
+        }
 
         if (missingFields.length > 0) {
             this.showNotice(`Bitte füllen Sie die Pflichtfelder aus: ${missingFields.join(', ')}`, 'error');
             return;
         }
 
-        // Convert currency fields
-        this.uxConfig.form_fields.forEach(field => {
-            if (field.type === 'currency' && data[field.name]) {
-                data[field.name] = this.parseCurrency(data[field.name]);
-            }
-        });
+        // Convert currency and number fields
+        if (this.uxConfig && this.uxConfig.form_fields) {
+            this.uxConfig.form_fields.forEach(field => {
+                if (data[field.name]) {
+                    if (field.type === 'currency') {
+                        // Convert currency to number
+                        const parsedValue = this.parseCurrency(data[field.name]);
+                        // Only set if we got a valid number
+                        if (!isNaN(parsedValue) && parsedValue !== null && parsedValue !== '') {
+                            data[field.name] = parsedValue;
+                        } else {
+                            // Remove invalid currency values
+                            delete data[field.name];
+                        }
+                    } else if (field.type === 'number') {
+                        // Convert to number
+                        const parsedValue = parseFloat(data[field.name]);
+                        if (!isNaN(parsedValue)) {
+                            data[field.name] = parsedValue;
+                        } else {
+                            // Remove invalid number values
+                            delete data[field.name];
+                        }
+                    }
+                }
+            });
+        }
 
         this.showLoading('Daten werden gespeichert...');
 
         try {
-            await this.apiRequest('/save-data', {
+            const response = await this.apiRequest('/save-data', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -483,8 +632,14 @@ class WebScraperApp {
                 })
             });
 
-            this.showNotice('Daten erfolgreich in NocoDB gespeichert!', 'success');
-            this.backToURLInput();
+            if (response.success) {
+                this.showNotice('Daten erfolgreich in NocoDB gespeichert!', 'success');
+                this.backToURLInput();
+                // Clear the URL input
+                document.getElementById('url-input').value = '';
+            } else {
+                this.showNotice(response.message, 'warning');
+            }
         } catch (error) {
             this.showNotice('Fehler beim Speichern: ' + error.message, 'error');
         } finally {
@@ -493,8 +648,13 @@ class WebScraperApp {
     }
 
     parseCurrency(value) {
-        // Remove currency symbols and format as number
-        return value.replace(/[€$£¥]/g, '').replace(/\./g, '').replace(',', '.');
+        if (!value || value.trim() === '') {
+            return null;
+        }
+        // Remove currency symbols and convert to number
+        const cleaned = value.replace(/[€$£¥]/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? null : parsed;
     }
 
     // Status Monitoring
@@ -507,9 +667,9 @@ class WebScraperApp {
                 console.error('Status check failed:', error);
             }
         };
-
+        console.log("DEBUG: Starting status polling...");
         checkStatus();
-        setInterval(checkStatus, 30000); // Check every 30 seconds
+        setInterval(checkStatus, 60000); // Check every 60 seconds
     }
 
     updateStatusIndicators(statusData) {

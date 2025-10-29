@@ -1,7 +1,7 @@
 {
   "app_name": "NocoDB Web Scraper",
   "app_description": "A secure, multi-user web application for scraping data from websites and populating it into NocoDB",
-  "signup_secret": "Test123$",
+  "signup_secret": "change-this-secret-password-for-signup",
   "frontend_config": {
     "title": "NocoDB Web Scraper",
     "welcome_message": "Welcome to NocoDB Web Scraper",

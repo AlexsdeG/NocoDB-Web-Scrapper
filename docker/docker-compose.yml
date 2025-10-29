@@ -13,20 +13,21 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
-      # Mount data directory for persistence
+      # Mount data directory for persistence with proper permissions
       - ../backend/data:/app/data:rw
       # Optional: Mount logs directory
       - backend-logs:/app/logs
     networks:
       - scraper-network
     ports:
-      - "127.0.0.1:8091:8091"  # Bind to localhost only (nginx will proxy)
+      - "127.0.0.1:8091:8000"  # Bind to localhost only (nginx will proxy)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    # User is set in Dockerfile to pwuser (UID 1001)
 
   # Frontend Nginx service
   frontend:
