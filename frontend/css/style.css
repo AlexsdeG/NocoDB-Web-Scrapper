@@ -201,7 +201,8 @@ body {
 .form-row {
     display: flex;
     gap: 1rem;
-    align-items: end;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .form-row .flex-grow {
@@ -332,12 +333,12 @@ input:invalid {
 
 @media (min-width: 768px) {
     .url-form {
-        flex-direction: row;
-        align-items: end;
+        flex-direction: column;
     }
     
     .url-form button {
         white-space: nowrap;
+        margin-top: 13px;
     }
 }
 

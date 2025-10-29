@@ -187,6 +187,14 @@ class ConfigManager:
         
         return None
     
+    def reload_login_data(self) -> None:
+        """Reload login credentials from file."""
+        self._login_data = None
+    
+    def reload_user_map(self) -> None:
+        """Reload user map from file."""
+        self._user_map = None
+    
     def reload_configs(self) -> None:
         """Reload all configuration files."""
         self._config = None

@@ -124,19 +124,14 @@ def check_existing_url(url: str, url_field_id: str) -> Optional[Dict[str, Any]]:
         # Use exact match filter: (fieldId,eq,value)
         # NocoDB filter format: where=(field,operator,value)
         where_clause = f"where=({url_field_id},eq,{quote(url)})"
-        print("DEBUG: Checking existing URL with filter clause:", where_clause)
         
         response = requests.get(f"{table_url}?{where_clause}", headers=headers)
-        print("DEBUG: NocoDB response status:", response.status_code)
         
         if response.status_code == 200:
             data = response.json()
             records = data.get("list", [])
-            print("DEBUG: NocoDB response data:", json.dumps(data, indent=2))
             if records:
                 return records[0]  # Return the first matching record
-        else:
-            print("DEBUG: NocoDB response text:", response.text)
         
         return None
         
@@ -325,7 +320,6 @@ async def save_data(
         table_url = get_nocodb_table_url()
         headers = get_nocodb_headers()
         
-        print("DEBUG SAVE DATA: Sending to NocoDB", json.dumps(nocodb_data, indent=2))
         response = requests.post(table_url, json=nocodb_data, headers=headers)
         
         if response.status_code not in [200, 201]:
@@ -478,7 +472,6 @@ async def scrape_url(
         table_url = get_nocodb_table_url()
         headers = get_nocodb_headers()
         
-        print("DEBUG SCRAPE: Sending to NocoDB", json.dumps(nocodb_data, indent=2))
         response = requests.post(table_url, json=nocodb_data, headers=headers)
         
         if response.status_code not in [200, 201]:
@@ -580,10 +573,14 @@ async def signup_user(request: SignupRequest):
         login_data[request.username] = hashed_password
         config_manager.save_login_data(login_data)
         
-        # Update user map
+        # Update user map with lowercase email
         user_map = config_manager.user_map
-        user_map[request.username] = request.nocodb_email
+        user_map[request.username] = request.nocodb_email.lower()
         config_manager.save_user_map(user_map)
+        
+        # Reload both to ensure in-memory cache matches files
+        config_manager.reload_login_data()
+        config_manager.reload_user_map()
         
         return {"message": "User successfully registered"}
         
@@ -602,19 +599,31 @@ async def update_user(
 ):
     """Update current user's information."""
     try:
+        updated = False
+        
         # Update password if provided
         if request.new_password:
-            login_data = config_manager.login_data
+            login_data = config_manager.login_data.copy()
             login_data[current_user] = get_password_hash(request.new_password)
             config_manager.save_login_data(login_data)
+            # Reload to ensure in-memory cache is updated
+            config_manager.reload_login_data()
+            updated = True
         
         # Update email if provided
         if request.nocodb_email:
-            user_map = config_manager.user_map
-            user_map[current_user] = request.nocodb_email
+            user_map = config_manager.user_map.copy()
+            # Normalize email to lowercase
+            user_map[current_user] = request.nocodb_email.lower()
             config_manager.save_user_map(user_map)
+            # Reload to ensure in-memory cache is updated
+            config_manager.reload_user_map()
+            updated = True
         
-        return {"message": "User information updated successfully"}
+        if updated:
+            return {"message": "User information updated successfully"}
+        else:
+            return {"message": "No changes were made"}
         
     except Exception as e:
         raise HTTPException(

@@ -80,7 +80,10 @@ class WebScraperApp {
             }
         } catch (error) {
             console.error('Failed to load UX config:', error);
-            this.showNotice('Fehler beim Laden der Konfiguration', 'error');
+            // Don't show error on initial load if not authenticated
+            if (this.isAuthenticated()) {
+                this.showNotice('Fehler beim Laden der Konfiguration', 'error');
+            }
         }
     }
 
@@ -114,6 +117,10 @@ class WebScraperApp {
                 // Verify token by making a protected request
                 await this.apiRequest('/status');
                 this.currentUser = this.getUsernameFromToken();
+                // Reload UX config if not loaded
+                if (!this.uxConfig) {
+                    await this.loadUXConfig();
+                }
                 this.showMainInterface();
             } catch (error) {
                 localStorage.removeItem('access_token');
@@ -153,6 +160,10 @@ class WebScraperApp {
 
             localStorage.setItem('access_token', response.access_token);
             this.currentUser = formData.get('username');
+            
+            // Reload UX config after login
+            await this.loadUXConfig();
+            
             this.showMainInterface();
             this.showNotice('Erfolgreich angemeldet!', 'success');
         } catch (error) {
@@ -192,12 +203,14 @@ class WebScraperApp {
         // Clear authentication data
         localStorage.removeItem('access_token');
         this.currentUser = null;
+        document.getElementById('username-display').textContent = 'Benutzer'
         
         // Clear all application data
         this.currentUrl = null;
         this.currentMode = null;
         this.scrapedData = null;
-        this.uxConfig = null;
+        // Don't clear uxConfig - keep it for UI consistency
+        // this.uxConfig = null;
         
         // Clear all form inputs
         this.clearAllFormInputs();
@@ -230,10 +243,12 @@ class WebScraperApp {
         // Clear signup form
         const signupUsername = document.getElementById('signup-username');
         const signupPassword = document.getElementById('signup-password');
+        const signupRepassword = document.getElementById('signup-repassword');
         const signupEmail = document.getElementById('signup-email');
         const signupSecret = document.getElementById('signup-secret');
         if (signupUsername) signupUsername.value = '';
         if (signupPassword) signupPassword.value = '';
+        if (signupRepassword) signupRepassword.value = '';
         if (signupEmail) signupEmail.value = '';
         if (signupSecret) signupSecret.value = '';
         
@@ -342,13 +357,17 @@ class WebScraperApp {
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData);
         
+        // Get password confirmation field value (not in FormData if empty)
+        const passwordConfirm = document.getElementById('settings-password-confirm');
+        const passwordConfirmValue = passwordConfirm ? passwordConfirm.value : '';
+        
         // Validate passwords match
-        if (data.new_password && data.new_password !== data.password_confirm) {
+        if (data.new_password && data.new_password !== passwordConfirmValue) {
             this.showNotice('Passwörter stimmen nicht überein', 'error');
             return;
         }
 
-        // Remove password confirmation
+        // Remove password confirmation (it's not sent to backend)
         delete data.password_confirm;
         
         // Remove empty password
@@ -368,8 +387,16 @@ class WebScraperApp {
             });
 
             this.showNotice('Einstellungen erfolgreich gespeichert!', 'success');
-            e.target.reset();
-            document.getElementById('settings-username').value = this.currentUser;
+            
+            // Reload user settings to show updated values
+            await this.loadUserSettings();
+            
+            // Clear password fields only
+            const newPasswordField = document.getElementById('settings-password');
+            const confirmPasswordField = document.getElementById('settings-password-confirm');
+            if (newPasswordField) newPasswordField.value = '';
+            if (confirmPasswordField) confirmPasswordField.value = '';
+            
         } catch (error) {
             this.showNotice('Fehler beim Speichern: ' + error.message, 'error');
         } finally {
@@ -382,6 +409,18 @@ class WebScraperApp {
         e.preventDefault();
         
         if (!this.requireAuth()) return;
+        
+        // Ensure UX config is loaded
+        if (!this.uxConfig) {
+            this.showLoading('Konfiguration wird geladen...');
+            await this.loadUXConfig();
+            this.hideLoading();
+            
+            if (!this.uxConfig) {
+                this.showNotice('Fehler: Konfiguration konnte nicht geladen werden', 'error');
+                return;
+            }
+        }
         
         const formData = new FormData(e.target);
         const url = formData.get('url');
@@ -439,6 +478,7 @@ class WebScraperApp {
 
         if (!this.uxConfig || !this.uxConfig.form_fields) {
             this.showNotice('Formularkonfiguration nicht gefunden', 'error');
+            console.error('UX Config:', this.uxConfig);
             return;
         }
 
@@ -667,7 +707,6 @@ class WebScraperApp {
                 console.error('Status check failed:', error);
             }
         };
-        console.log("DEBUG: Starting status polling...");
         checkStatus();
         setInterval(checkStatus, 60000); // Check every 60 seconds
     }
