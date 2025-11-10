@@ -8,6 +8,7 @@ class WebScraperApp {
         this.currentMode = null;
         this.scrapedData = null;
         this.tokenRefreshTimer = null;
+        this.sessionHistory = [];
         
         this.init();
     }
@@ -16,9 +17,16 @@ class WebScraperApp {
         this.bindEvents();
         await this.loadUXConfig();
         this.checkAuthStatus();
-        
+        this.sessionHistory = [];
+
         // Start status polling status
         this.startStatusPolling();
+    }
+
+    loadSessionHistory() {
+        // Session history is reset on page reload (not persisted)
+        this.sessionHistory = [];
+        this.updateHistoryDisplay();
     }
     
     isAuthenticated() {
@@ -278,6 +286,7 @@ class WebScraperApp {
         document.getElementById('username-display').textContent = this.currentUser;
         document.getElementById('settings-username').value = this.currentUser;
         this.showView('main-view');
+        this.updateHistoryDisplay();
         this.startTokenRefresh();
     }
 
@@ -449,6 +458,10 @@ class WebScraperApp {
                 this.showEditForm();
             } else {
                 this.showNotice(response.message, 'warning');
+                // Clear the URL input field if URL already exists in database
+                if (response.data && response.data.existing_record) {
+                    document.getElementById('url-input').value = '';
+                }
             }
         } catch (error) {
             this.showNotice('Fehler bei der URL-Prüfung: ' + error.message, 'error');
@@ -465,6 +478,99 @@ class WebScraperApp {
             return false;
         }
     }
+
+    // History and Delete
+    // NEW: Add this method after init()
+    loadSessionHistory() {
+        // Session history is reset on page reload (not persisted)
+        this.sessionHistory = [];
+        this.updateHistoryDisplay();
+    }
+
+    // NEW: Add this method to save history item
+    addToHistory(recordId, url) {
+        // Add to beginning of array (newest first)
+        this.sessionHistory.unshift({
+            id: recordId,
+            url: url,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Keep only last 5 items
+        if (this.sessionHistory.length > 5) {
+            this.sessionHistory = this.sessionHistory.slice(0, 5);
+        }
+        
+        this.updateHistoryDisplay();
+    }
+
+    // NEW: Add this method to update history display
+    updateHistoryDisplay() {
+        const historyContainer = document.getElementById('history-list');
+        if (!historyContainer) return;
+        
+        if (this.sessionHistory.length === 0) {
+            historyContainer.innerHTML = '<p class="history-empty">Noch keine Einträge in dieser Sitzung</p>';
+            return;
+        }
+        
+        historyContainer.innerHTML = this.sessionHistory.map(item => `
+            <div class="history-item">
+                <div class="history-info">
+                    <a href="${item.url}" target="_blank" class="history-url" title="${item.url}">
+                        <i class="fas fa-external-link-alt"></i> ${this.truncateUrl(item.url)}
+                    </a>
+                    <span class="history-id">ID: ${item.id}</span>
+                </div>
+                <button class="btn btn-danger btn-small" onclick="app.confirmDelete('${item.id}')" title="Löschen">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    // NEW: Add this helper method to truncate URLs
+    truncateUrl(url, maxLength = 50) {
+        if (url.length <= maxLength) return url;
+        return url.substring(0, maxLength) + '...';
+    }
+
+    // NEW: Add this method to confirm deletion
+    confirmDelete(recordId) {
+        if (confirm('Möchten Sie diesen Eintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+            this.deleteRecord(recordId);
+        }
+    }
+
+    // NEW: Add this method to delete a record
+    async deleteRecord(recordId) {
+        this.showLoading('Eintrag wird gelöscht...');
+        
+        try {
+            const response = await this.apiRequest('/delete-record', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ record_id: recordId })
+            });
+
+            if (response.success) {
+                this.showNotice('Eintrag erfolgreich gelöscht!', 'success');
+                
+                // Remove from history
+                this.sessionHistory = this.sessionHistory.filter(item => item.id !== recordId);
+                this.updateHistoryDisplay();
+            } else {
+                this.showNotice(response.message, 'error');
+            }
+        } catch (error) {
+            this.showNotice('Fehler beim Löschen: ' + error.message, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
 
     // Edit Form
     showEditForm() {
@@ -496,6 +602,7 @@ class WebScraperApp {
         
         const editSection = document.getElementById('edit-section');
         const urlSection = document.getElementById('url-section');
+        const historySection = document.getElementById('history-section');
         
         if (editSection) {
             editSection.classList.remove('hidden');
@@ -507,6 +614,13 @@ class WebScraperApp {
             urlSection.classList.add('hidden');
         } else {
             console.error('URL section not found');
+        }
+
+        // Hide history section when editing
+        if (historySection) {
+            historySection.classList.add('hidden');
+        } else {
+            console.error('History section not found');
         }
     }
 
@@ -577,6 +691,7 @@ class WebScraperApp {
     backToURLInput() {
         const editSection = document.getElementById('edit-section');
         const urlSection = document.getElementById('url-section');
+        const historySection = document.getElementById('history-section');
         
         if (editSection) {
             editSection.classList.add('hidden');
@@ -588,6 +703,13 @@ class WebScraperApp {
             urlSection.classList.remove('hidden');
         } else {
             console.error('URL section not found');
+        }
+
+        // Show history section when going back
+        if (historySection) {
+            historySection.classList.remove('hidden');
+        } else {
+            console.error('History section not found');
         }
         
         this.currentUrl = null;
@@ -674,11 +796,20 @@ class WebScraperApp {
 
             if (response.success) {
                 this.showNotice('Daten erfolgreich in NocoDB gespeichert!', 'success');
+
+                // NEW: Add to history if we have a record ID
+                if (response.record_id) {
+                    this.addToHistory(response.record_id, this.currentUrl);
+                }
+
                 this.backToURLInput();
                 // Clear the URL input
                 document.getElementById('url-input').value = '';
             } else {
                 this.showNotice(response.message, 'warning');
+                // Clear the URL input field and go back if URL already exists in database
+                this.backToURLInput();
+                document.getElementById('url-input').value = '';
             }
         } catch (error) {
             this.showNotice('Fehler beim Speichern: ' + error.message, 'error');
@@ -826,6 +957,7 @@ class WebScraperApp {
 }
 
 // Initialize the application when DOM is ready
+let app; // Global reference for inline event handlers
 document.addEventListener('DOMContentLoaded', () => {
-    new WebScraperApp();
+    app = new WebScraperApp();
 });

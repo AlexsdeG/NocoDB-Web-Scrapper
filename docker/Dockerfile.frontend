@@ -6,6 +6,7 @@ RUN apk add --no-cache wget
 
 # Copy frontend files to nginx html directory
 COPY frontend/index.html /usr/share/nginx/html/
+COPY frontend/favicon.ico /usr/share/nginx/html/
 COPY frontend/css /usr/share/nginx/html/css/
 COPY frontend/js /usr/share/nginx/html/js/
 

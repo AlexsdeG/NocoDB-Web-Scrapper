@@ -87,6 +87,13 @@ class SaveDataResponse(BaseModel):
 class UXConfigResponse(BaseModel):
     success: bool
     config: Dict[str, Any]
+    
+class DeleteRecordRequest(BaseModel):
+    record_id: str
+
+class DeleteRecordResponse(BaseModel):
+    success: bool
+    message: str
 
 # Utility functions
 def get_nocodb_headers() -> Dict[str, str]:
@@ -346,6 +353,51 @@ async def save_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Save failed: {str(e)}"
+        )
+        
+@app.delete("/delete-record", response_model=DeleteRecordResponse)
+async def delete_record(
+    request: DeleteRecordRequest,
+    current_user: str = Depends(get_current_user)
+):
+    """Delete a record from NocoDB by ID."""
+    try:
+        record_id = request.record_id
+        
+        if not record_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Record ID is required"
+            )
+        
+        # Get NocoDB table URL and headers
+        table_url = get_nocodb_table_url()
+        headers = get_nocodb_headers()
+        
+        # Delete the record using the NocoDB API
+        # According to the screenshot, we need to send an array of record IDs
+        delete_data = [{"Id": int(record_id)}]
+        
+        response = requests.delete(table_url, json=delete_data, headers=headers)
+        
+        if response.status_code not in [200, 204]:
+            error_detail = f"NocoDB API error: {response.status_code} - {response.text}"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_detail
+            )
+        
+        return DeleteRecordResponse(
+            success=True,
+            message="Record successfully deleted from NocoDB"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Delete failed: {str(e)}"
         )
 
 @app.post("/token", response_model=Token)
